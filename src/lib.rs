@@ -52,8 +52,8 @@ mod tree_state;
 /// ```
 #[must_use]
 #[derive(Debug, Clone)]
-pub struct Tree<'a, Identifier> {
-    items: &'a [TreeItem<'a, Identifier>],
+pub struct Tree<'a, Identifier, Content: Widget> {
+    items: &'a [TreeItem<Identifier, Content>],
 
     block: Option<Block<'a>>,
     scrollbar: Option<Scrollbar<'a>>,
@@ -73,16 +73,17 @@ pub struct Tree<'a, Identifier> {
     node_no_children_symbol: &'a str,
 }
 
-impl<'a, Identifier> Tree<'a, Identifier>
+impl<'a, Identifier, Content> Tree<'a, Identifier, Content>
 where
     Identifier: Clone + PartialEq + Eq + core::hash::Hash,
+    Content: Clone + Widget,
 {
     /// Create a new `Tree`.
     ///
     /// # Errors
     ///
     /// Errors when there are duplicate identifiers in the children.
-    pub fn new(items: &'a [TreeItem<'a, Identifier>]) -> std::io::Result<Self> {
+    pub fn new(items: &'a [TreeItem<Identifier, Content>]) -> std::io::Result<Self> {
         let identifiers = items
             .iter()
             .map(|item| &item.identifier)
@@ -162,9 +163,11 @@ fn tree_new_errors_with_duplicate_identifiers() {
     let _: Tree<_> = Tree::new(&items).unwrap();
 }
 
-impl<Identifier> StatefulWidget for Tree<'_, Identifier>
+impl<Identifier, Content> StatefulWidget for &Tree<'_, Identifier, Content>
 where
     Identifier: Clone + PartialEq + Eq + core::hash::Hash,
+    Content: Clone + Widget,
+    for<'a> &'a Content: Widget
 {
     type State = TreeState<Identifier>;
 
@@ -173,7 +176,7 @@ where
         buf.set_style(full_area, self.style);
 
         // Get the inner area inside a possible block, otherwise use the full area
-        let area = self.block.map_or(full_area, |block| {
+        let area = self.block.as_ref().map_or(full_area, |block| {
             let inner_area = block.inner(full_area);
             block.render(full_area, buf);
             inner_area
@@ -236,7 +239,7 @@ where
         state.offset = start;
         state.ensure_selected_in_view_on_next_render = false;
 
-        if let Some(scrollbar) = self.scrollbar {
+        if let Some(scrollbar) = self.scrollbar.clone() {
             let mut scrollbar_state = ScrollbarState::new(visible.len().saturating_sub(height))
                 .position(start)
                 .viewport_content_length(height);
@@ -271,8 +274,7 @@ where
                 height,
             };
 
-            let text = &item.text;
-            let item_style = text.style;
+            let item_style = item.style;
 
             let is_selected = state.selected == *identifier;
             let after_highlight_symbol_x = if has_selection {
@@ -314,7 +316,7 @@ where
                 width: area.width.saturating_sub(after_depth_x - x),
                 ..area
             };
-            text.render(text_area, buf);
+            Widget::render(&item.content, text_area, buf);
 
             if is_selected {
                 buf.set_style(area, self.highlight_style);
@@ -331,13 +333,41 @@ where
     }
 }
 
-impl<Identifier> Widget for Tree<'_, Identifier>
+impl<Identifier, Content> StatefulWidget for Tree<'_, Identifier, Content>
+where
+    Identifier: Clone + PartialEq + Eq + core::hash::Hash,
+    Content: Clone + Widget,
+    for<'a> &'a Content: Widget
+{
+    type State = TreeState<Identifier>;
+
+    #[expect(clippy::too_many_lines)]
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        StatefulWidget::render(&self, area, buf, state);
+    }
+}
+
+impl<Identifier, Content> Widget for &Tree<'_, Identifier, Content>
 where
     Identifier: Clone + Eq + core::hash::Hash,
+    Content: Clone + Widget,
+    for<'a> &'a Content: Clone + Widget,
 {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut state = TreeState::default();
         StatefulWidget::render(self, area, buf, &mut state);
+    }
+}
+
+impl<Identifier, Content> Widget for Tree<'_, Identifier, Content>
+where
+    Identifier: Clone + Eq + core::hash::Hash,
+    Content: Clone + Widget,
+    for<'a> &'a Content: Clone + Widget,
+{
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let mut state = TreeState::default();
+        StatefulWidget::render(&self, area, buf, &mut state);
     }
 }
 
@@ -347,12 +377,12 @@ mod render_tests {
 
     #[must_use]
     #[track_caller]
-    fn render(width: u16, height: u16, state: &mut TreeState<&'static str>) -> Buffer {
+    fn render<I>(width: u16, height: u16, state: &mut TreeState<I>) -> Buffer {
         let items = TreeItem::example();
         let tree = Tree::new(&items).unwrap();
         let area = Rect::new(0, 0, width, height);
         let mut buffer = Buffer::empty(area);
-        StatefulWidget::render(tree, area, &mut buffer, state);
+        StatefulWidget::render(&tree, area, &mut buffer, state);
         buffer
     }
 

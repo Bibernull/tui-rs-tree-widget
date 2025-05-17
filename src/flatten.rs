@@ -6,12 +6,12 @@ use crate::tree_item::TreeItem;
 ///
 /// Generated via [`TreeState::flatten`](crate::TreeState::flatten).
 #[must_use]
-pub struct Flattened<'text, Identifier> {
+pub struct Flattened<'text, Identifier, Content> {
     pub identifier: Vec<Identifier>,
-    pub item: &'text TreeItem<'text, Identifier>,
+    pub item: &'text TreeItem<Identifier, Content>,
 }
 
-impl<Identifier> Flattened<'_, Identifier> {
+impl<Identifier, Content> Flattened<'_, Identifier, Content> {
     /// Zero based depth. Depth 0 means top level with 0 indentation.
     #[must_use]
     pub fn depth(&self) -> usize {
@@ -23,11 +23,11 @@ impl<Identifier> Flattened<'_, Identifier> {
 ///
 /// `current` starts empty: `&[]`
 #[must_use]
-pub fn flatten<'text, Identifier>(
+pub fn flatten<'text, Identifier, Content>(
     open_identifiers: &HashSet<Vec<Identifier>>,
-    items: &'text [TreeItem<'text, Identifier>],
+    items: &'text [TreeItem<Identifier, Content>],
     current: &[Identifier],
-) -> Vec<Flattened<'text, Identifier>>
+) -> Vec<Flattened<'text, Identifier, Content>>
 where
     Identifier: Clone + PartialEq + Eq + core::hash::Hash,
 {

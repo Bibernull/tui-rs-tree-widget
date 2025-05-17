@@ -77,10 +77,10 @@ where
 
     /// Get a flat list of all currently viewable (including by scrolling) [`TreeItem`]s with this `TreeState`.
     #[must_use]
-    pub fn flatten<'text>(
+    pub fn flatten<'text, Content>(
         &self,
-        items: &'text [TreeItem<'text, Identifier>],
-    ) -> Vec<Flattened<'text, Identifier>> {
+        items: &'text [TreeItem<Identifier, Content>],
+    ) -> Vec<Flattened<'text, Identifier, Content>> {
         flatten(&self.opened, items, &[])
     }
 

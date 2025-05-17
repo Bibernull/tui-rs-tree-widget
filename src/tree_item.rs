@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use ratatui_core::text::Text;
+use ratatui_core::{style::{Style, Styled}, widgets::Widget};
 
 /// One item inside a [`Tree`](crate::Tree).
 ///
@@ -34,26 +34,43 @@ use ratatui_core::text::Text;
 /// # Ok::<(), std::io::Error>(())
 /// ```
 #[derive(Debug, Clone)]
-pub struct TreeItem<'text, Identifier> {
+pub struct TreeItem<Identifier, Content> {
     pub(super) identifier: Identifier,
-    pub(super) text: Text<'text>,
+    pub(super) content: Content,
+    pub(super) style: Style,
     pub(super) children: Vec<Self>,
 }
 
-impl<'text, Identifier> TreeItem<'text, Identifier>
+impl<'text, Identifier, Content> Styled for TreeItem<Identifier, Content>
 where
     Identifier: Clone + PartialEq + Eq + core::hash::Hash,
+    Content: Clone + Widget,
+{
+    type Item = TreeItem<Identifier, Content>;
+
+    fn style(&self) -> Style {
+        Style::default()
+    }
+
+    fn set_style<S: Into<Style>>(self, style: S) -> Self::Item {
+        self.style(style)
+    }
+}
+
+impl<'text, Identifier, Content> TreeItem<Identifier, Content>
+where
+    Identifier: Clone + PartialEq + Eq + core::hash::Hash,
+    Content: Clone + Widget,
 {
     /// Create a new `TreeItem` without children.
     #[must_use]
-    pub fn new_leaf<T>(identifier: Identifier, text: T) -> Self
-    where
-        T: Into<Text<'text>>,
+    pub fn new_leaf(identifier: Identifier, content: Content) -> Self
     {
         Self {
             identifier,
-            text: text.into(),
+            content,
             children: Vec::new(),
+            style: Style::default(),
         }
     }
 
@@ -62,9 +79,7 @@ where
     /// # Errors
     ///
     /// Errors when there are duplicate identifiers in the children.
-    pub fn new<T>(identifier: Identifier, text: T, children: Vec<Self>) -> std::io::Result<Self>
-    where
-        T: Into<Text<'text>>,
+    pub fn new(identifier: Identifier, content: Content, children: Vec<Self>) -> std::io::Result<Self>
     {
         let identifiers = children
             .iter()
@@ -79,9 +94,34 @@ where
 
         Ok(Self {
             identifier,
-            text: text.into(),
+            content,
             children,
+            style: Style::default(),
         })
+    }
+
+    pub fn styled_leaf<S>(identifier: Identifier, content: Content, style: S) -> Self
+    where
+        S: Into<Style>,
+    {
+        Self::new_leaf(identifier, content).style(style)
+    }
+
+    pub fn styled<S>(
+        identifier: Identifier,
+        content: Content,
+        children: Vec<Self>,
+        style: S,
+    ) -> std::io::Result<Self>
+    where
+        S: Into<Style>,
+    {
+        Ok(Self::new(identifier, content, children)?.style(style))
+    }
+    #[must_use = "method moves the value of self and returns the modified value"]
+    pub fn style<S: Into<Style>>(mut self, style: S) -> Self {
+        self.style = style.into();
+        self
     }
 
     /// Get a reference to the identifier.
@@ -111,7 +151,7 @@ where
 
     #[must_use]
     pub fn height(&self) -> usize {
-        self.text.height()
+        1
     }
 
     /// Add a child to the `TreeItem`.
@@ -137,7 +177,7 @@ where
     }
 }
 
-impl TreeItem<'static, &'static str> {
+impl TreeItem<&str, &str> {
     #[cfg(test)]
     #[must_use]
     pub(crate) fn example() -> Vec<Self> {

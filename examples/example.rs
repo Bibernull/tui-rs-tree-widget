@@ -13,7 +13,7 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 #[must_use]
 struct App {
     state: TreeState<&'static str>,
-    items: Vec<TreeItem<'static, &'static str>>,
+    items: Vec<TreeItem<&'static str>>,
 }
 
 impl App {
